@@ -17,9 +17,9 @@
 package de.heikoseeberger.akkamazing
 
 import akka.actor.Props
+import akka.contrib.pattern.ClusterSingletonProxy
 import akka.io.IO
 import akka.pattern.ask
-import akka.routing.FromConfig
 import spray.can.Http
 import spray.http.StatusCodes
 import spray.httpx.SprayJsonSupport
@@ -36,7 +36,8 @@ class HttpService(hostname: String, port: Int) extends HttpServiceActor with Spr
   import context.dispatcher
   import settings.httpService.askTimeout
 
-  private val userServicve = context.actorOf(FromConfig.props(), "user-service")
+  private val userServicve =
+    context.actorOf(ClusterSingletonProxy.props("/user/singleton/user-service", Some("user-service")), "user-service")
 
   override def preStart(): Unit =
     IO(Http)(context.system) ! Http.Bind(self, hostname, port)
