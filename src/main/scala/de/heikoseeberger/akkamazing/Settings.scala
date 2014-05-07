@@ -17,12 +17,17 @@
 package de.heikoseeberger.akkamazing
 
 import akka.actor.{ Actor, ExtendedActorSystem, Extension, ExtensionKey }
+import akka.util.Timeout
+import scala.concurrent.duration.{ Duration, MILLISECONDS => Millis }
 
 object Settings extends ExtensionKey[Settings]
 
 class Settings(system: ExtendedActorSystem) extends Extension {
 
   object httpService {
+
+    implicit val askTimeout: Timeout =
+      Duration(akkamazing.getDuration("http-service.ask-timeout", Millis), Millis)
 
     val hostname: String =
       akkamazing getString "http-service.hostname"
