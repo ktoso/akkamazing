@@ -16,16 +16,17 @@
 
 package de.heikoseeberger.akkamazing
 
-import akka.actor.{ ActorSystem, PoisonPill }
-import akka.contrib.pattern.ClusterSingletonManager
+import akka.actor.{ ActorSystem, Props }
+import akka.persistence.journal.leveldb.{ SharedLeveldbJournal, SharedLeveldbStore }
 
-object UserServiceApp extends BaseApp {
+/**
+ * The shared journal is a single point of failure and must not be used in production.
+ * This app must be running in order for persistence and cluster sharding to work.
+ */
+object SharedJournalApp extends BaseApp {
 
-  override protected def run(system: ActorSystem, opts: Map[String, String]): Unit = {
-    system.actorOf(SharedJournalSetter.props, "shared-journal-setter")
-    system.actorOf(
-      ClusterSingletonManager.props(UserService.props, "user-service", PoisonPill, Some("user-service")),
-      "singleton"
-    )
+  override def run(system: ActorSystem, opts: Map[String, String]): Unit = {
+    val sharedJournal = system.actorOf(Props(new SharedLeveldbStore), "shared-journal")
+    SharedLeveldbJournal.setStore(sharedJournal, system)
   }
 }
