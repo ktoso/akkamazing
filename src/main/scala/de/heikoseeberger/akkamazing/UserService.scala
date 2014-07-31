@@ -17,24 +17,29 @@
 package de.heikoseeberger.akkamazing
 
 import akka.actor.{ ActorLogging, Props }
+import akka.contrib.pattern.ShardRegion
 import akka.persistence.PersistentActor
 import spray.json.DefaultJsonProtocol
 
 object UserService {
 
-  // GetUsers
+  // Sharding
+  object Shard {
+    val name = "UserService"
 
-  case object GetUsers
-
-  sealed trait GetUsersResponse
-
-  object GetUsersResponse {
-
-    object Users extends DefaultJsonProtocol {
-      implicit val format = jsonFormat1(apply)
+    val shardExtractor: ShardRegion.ShardResolver = {
+      case m: ShardedBy => m.name.take(1)
     }
 
-    case class Users(names: Set[String]) extends GetUsersResponse
+    val idExtractor: ShardRegion.IdExtractor = {
+      case m: ShardedBy => (m.name, m)
+    }
+  }
+
+  // Trait used by all commands sent via Cluster Sharding
+
+  trait ShardedBy {
+    def name: String
   }
 
   // SignUp
@@ -43,26 +48,26 @@ object UserService {
     implicit val format = jsonFormat1(apply)
   }
 
-  case class SignUp(name: String)
+  case class SignUp(name: String) extends ShardedBy
 
-  sealed trait SignUpResponse
+  sealed trait UserServiceResponse
 
-  object SignUpResponse {
+  object UserServiceResponse {
 
-    case class SignedUp(name: String) extends SignUpResponse
+    case class SignedUp(name: String) extends UserServiceResponse
 
-    case class NameTaken(name: String) extends SignUpResponse
+    case class NameTaken(name: String) extends UserServiceResponse
   }
 
   // Props factories
 
   def props: Props =
-    Props(new UserService)
+    Props[UserService]
 }
 
 class UserService extends PersistentActor with ActorLogging {
 
-  import UserService._
+  import de.heikoseeberger.akkamazing.UserService._
 
   override val persistenceId: String =
     "user-service"
@@ -70,22 +75,21 @@ class UserService extends PersistentActor with ActorLogging {
   private var names = Set.empty[String]
 
   override def receiveCommand: Receive = {
-    case GetUsers                            => sender() ! GetUsersResponse.Users(names)
-    case SignUp(name) if names contains name => sender() ! SignUpResponse.NameTaken(name)
-    case SignUp(name)                        => persist(SignUpResponse.SignedUp(name))(handleSignedUpThenRespond)
+    case SignUp(name) if names contains name => sender() ! UserServiceResponse.NameTaken(name)
+    case SignUp(name)                        => persist(UserServiceResponse.SignedUp(name))(handleSignedUpThenRespond)
   }
 
   override def receiveRecover: Receive = {
-    case signedUp: SignUpResponse.SignedUp => handleSignedUp(signedUp)
+    case signedUp: UserServiceResponse.SignedUp => handleSignedUp(signedUp)
   }
 
-  private def handleSignedUpThenRespond(signedUp: SignUpResponse.SignedUp): Unit = {
+  private def handleSignedUpThenRespond(signedUp: UserServiceResponse.SignedUp): Unit = {
     handleSignedUp(signedUp)
     sender() ! signedUp
   }
 
-  private def handleSignedUp(signedUp: SignUpResponse.SignedUp): Unit = {
-    val SignUpResponse.SignedUp(name) = signedUp
+  private def handleSignedUp(signedUp: UserServiceResponse.SignedUp): Unit = {
+    val UserServiceResponse.SignedUp(name) = signedUp
     log.info("Signing up {}", name)
     names += name
   }

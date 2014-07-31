@@ -17,11 +17,20 @@
 package de.heikoseeberger.akkamazing
 
 import akka.actor.ActorSystem
+import akka.contrib.pattern.ClusterSharding
 
 object HttpServiceApp extends BaseApp {
 
   override protected def run(system: ActorSystem, opts: Map[String, String]): Unit = {
     val settings = Settings(system)
+
+    ClusterSharding(system).start(
+      typeName = UserService.Shard.name,
+      entryProps = Some(UserService.props),
+      idExtractor = UserService.Shard.idExtractor,
+      shardResolver = UserService.Shard.shardExtractor
+    )
+
     import settings.httpService._
     system.actorOf(HttpService.props(hostname, port), "http-service")
   }
