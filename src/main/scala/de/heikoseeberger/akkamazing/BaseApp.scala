@@ -16,9 +16,9 @@
 
 package de.heikoseeberger.akkamazing
 
-import akka.actor.ActorSystem
+import akka.actor._
+
 import scala.collection.breakOut
-import scala.io.StdIn
 
 abstract class BaseApp {
 
@@ -27,11 +27,9 @@ abstract class BaseApp {
   def main(args: Array[String]): Unit = {
     val opts = argsToOpts(args.toList)
     applySystemProperties(opts)
-    val name = opts.getOrElse("name", "akkamazing")
-
-    val system = ActorSystem(s"$name-system")
+    val system = ActorSystem(s"akkamazing-system")
     run(system, opts)
-    StdIn.readLine("Hit ENTER to quit ...")
+    readLine("Hit ENTER to quit ...")
     system.shutdown()
     system.awaitTermination()
   }
@@ -44,4 +42,5 @@ abstract class BaseApp {
   private def applySystemProperties(options: Map[String, String]): Unit =
     for ((key, value) <- options if key startsWith "-D")
       System.setProperty(key substring 2, value)
+  
 }

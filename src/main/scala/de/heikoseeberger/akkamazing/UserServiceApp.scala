@@ -16,16 +16,19 @@
 
 package de.heikoseeberger.akkamazing
 
-import akka.actor.{ ActorSystem, PoisonPill }
-import akka.contrib.pattern.ClusterSingletonManager
+import akka.actor.ActorSystem
+import akka.contrib.pattern.ClusterSharding
 
 object UserServiceApp extends BaseApp {
 
   override protected def run(system: ActorSystem, opts: Map[String, String]): Unit = {
     system.actorOf(SharedJournalSetter.props, "shared-journal-setter")
-    system.actorOf(
-      ClusterSingletonManager.props(UserService.props, "user-service", PoisonPill, Some("user-service")),
-      "singleton"
+
+    ClusterSharding(system).start(
+      UserService.Shard.name,
+      Some(UserService.props),
+      UserService.Shard.idExtractor,
+      UserService.Shard.shardResolver
     )
   }
 }

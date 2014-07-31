@@ -17,7 +17,7 @@
 package de.heikoseeberger.akkamazing
 
 import akka.actor.Props
-import akka.contrib.pattern.ClusterSingletonProxy
+import akka.contrib.pattern.ClusterSharding
 import akka.io.IO
 import akka.pattern.ask
 import spray.can.Http
@@ -36,8 +36,8 @@ class HttpService(hostname: String, port: Int) extends HttpServiceActor with Spr
   import context.dispatcher
   import settings.httpService.askTimeout
 
-  private val userServicve =
-    context.actorOf(ClusterSingletonProxy.props("/user/singleton/user-service", Some("user-service")), "user-service")
+  private val userService =
+    ClusterSharding(context.system).shardRegion(UserService.Shard.name)
 
   override def preStart(): Unit =
     IO(Http)(context.system) ! Http.Bind(self, hostname, port)
@@ -49,16 +49,16 @@ class HttpService(hostname: String, port: Int) extends HttpServiceActor with Spr
     // format: OFF
     pathPrefix("api") {
       path("users") {
-        import UserService._
+        import de.heikoseeberger.akkamazing.UserService._
         get {
           complete {
-            (userServicve ? GetUsers).mapTo[GetUsersResponse.Users]
+            (userService ? GetUsers).mapTo[GetUsersResponse.Users]
           }
         } ~
         post {
           entity(as[SignUp]) { signUp =>
             complete {
-              (userServicve ? signUp).mapTo[SignUpResponse] map {
+              (userService ? signUp).mapTo[SignUpResponse] map {
                 case SignUpResponse.NameTaken(name) => StatusCodes.Conflict
                 case SignUpResponse.SignedUp(name)  => StatusCodes.Created
               }
