@@ -16,10 +16,14 @@
 
 package de.heikoseeberger.akkamazing
 
-import akka.actor.{ ActorLogging, Props }
+import akka.actor.{ PoisonPill, ReceiveTimeout, ActorLogging, Props }
 import akka.contrib.pattern.ShardRegion
+import akka.contrib.pattern.ShardRegion.Passivate
 import akka.persistence.PersistentActor
+import de.heikoseeberger.akkamazing.UserService._
 import spray.json.DefaultJsonProtocol
+
+import scala.concurrent.duration._
 
 object UserService {
 
@@ -80,16 +84,25 @@ object UserService {
 
 class UserService extends PersistentActor with ActorLogging {
 
-  log.info("Started UserService for shard: {}", self.path.name)
+  log.info("Started UserService, shard: {}", self.path.name)
 
-  import de.heikoseeberger.akkamazing.UserService._
+  // if no message received within 15 seconds, initialise passivation
+  context setReceiveTimeout 15.seconds
 
   override def persistenceId: String =
     self.path.parent.name + "-" + self.path.name
 
   private var names = Set.empty[String]
 
-  override def receiveCommand: Receive = {
+  override def postStop() {
+    super.postStop()
+    log.info("Stopped UserService, shard: {}", self.path.name)
+  }
+
+  override def receiveCommand: Receive =
+    handleCommand orElse handleTimeout
+
+  def handleCommand: Receive = {
     case SignUp(name) if names contains name =>
       log.info("<< NameTaken({})", name)
       sender() ! SignUpResponse.NameTaken(name)
@@ -97,6 +110,12 @@ class UserService extends PersistentActor with ActorLogging {
     case SignUp(name) =>
       log.info("<< SignedUp({})", name)
       persist(SignUpResponse.SignedUp(name))(handleSignedUpThenRespond)
+  }
+
+  def handleTimeout: Receive = {
+    case ReceiveTimeout =>
+      log.info("Initialise passivation of UserService, shard: {}", self.path.name)
+      context.parent ! Passivate(stopMessage = PoisonPill)
   }
 
   override def receiveRecover: Receive = {

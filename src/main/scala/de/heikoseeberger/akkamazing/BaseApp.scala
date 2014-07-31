@@ -42,5 +42,5 @@ abstract class BaseApp {
   private def applySystemProperties(options: Map[String, String]): Unit =
     for ((key, value) <- options if key startsWith "-D")
       System.setProperty(key substring 2, value)
-  
+
 }
