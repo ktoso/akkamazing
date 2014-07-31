@@ -17,12 +17,23 @@
 package de.heikoseeberger.akkamazing
 
 import akka.actor.ActorSystem
+import akka.contrib.pattern.ClusterSharding
 
 object HttpServiceApp extends BaseApp {
 
   override protected def run(system: ActorSystem, opts: Map[String, String]): Unit = {
     val settings = Settings(system)
     import settings.httpService._
+
+    system.actorOf(SharedJournalSetter.props, "shared-journal-setter")
+
+    ClusterSharding(system).start(
+      UserService.Shard.name,
+      None,
+      UserService.Shard.idExtractor,
+      UserService.Shard.shardResolver
+    )
+
     system.actorOf(HttpService.props(hostname, port), "http-service")
   }
 }
