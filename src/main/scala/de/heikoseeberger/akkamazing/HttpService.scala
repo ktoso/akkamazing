@@ -20,11 +20,12 @@ import akka.actor.Props
 import akka.contrib.pattern.ClusterSharding
 import akka.io.IO
 import akka.pattern.ask
-import de.heikoseeberger.akkamazing.UserService.{ SignUpResponse, SignUp }
 import spray.can.Http
 import spray.http.StatusCodes
 import spray.httpx.SprayJsonSupport
 import spray.routing.{ HttpServiceActor, Route }
+
+import scala.concurrent.Future
 
 object HttpService {
 
@@ -46,10 +47,24 @@ class HttpService(hostname: String, port: Int) extends HttpServiceActor with Spr
   override def receive: Receive =
     runRoute(apiRoute)
 
+  import de.heikoseeberger.akkamazing.UserService._
+
   private def apiRoute: Route =
     // format: OFF
     pathPrefix("api") {
       path("users") {
+        get {
+          complete {
+            val users = for {
+              shard <- shardIds
+              us = (userService ? GetUsers(shard)).mapTo[GetUsersResponse.Users]
+            } yield us
+
+            Future.sequence(users) map { us =>
+              us.foldLeft(GetUsersResponse.Users(Set.empty))(_ ++ _)
+            }
+          }
+        } ~
         post {
           entity(as[SignUp]) { signUp =>
             complete {
@@ -62,4 +77,7 @@ class HttpService(hostname: String, port: Int) extends HttpServiceActor with Spr
         }
       }
     } // format: ON
+
+  def shardIds =
+    ("A".toCharArray.head.toInt to "Z".toCharArray.head.toInt).toList.map(_.toChar.toString)
 }

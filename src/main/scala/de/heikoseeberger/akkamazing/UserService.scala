@@ -20,6 +20,7 @@ import akka.actor.{ PoisonPill, ReceiveTimeout, ActorLogging, Props }
 import akka.contrib.pattern.ShardRegion
 import akka.contrib.pattern.ShardRegion.Passivate
 import akka.persistence.PersistentActor
+import de.heikoseeberger.akkamazing.UserService.GetUsersResponse.Users
 import de.heikoseeberger.akkamazing.UserService._
 import spray.json.DefaultJsonProtocol
 
@@ -33,12 +34,30 @@ object UserService {
     // id == shardId => one Actor takes care of a range of users
     // change this id to `name` to shard by initial letter, but keep 1 Actor per 1 user
     val idExtractor: ShardRegion.IdExtractor = {
-      case m: SignUp => m.name.take(1).toUpperCase -> m
+      case m: SignUp   => m.name.take(1).toUpperCase -> m
+      case m: GetUsers => m.shardId.take(1).toUpperCase -> m
     }
 
     // sharding on first letter of user-name
     val shardResolver: ShardRegion.ShardResolver = {
-      case SignUp(m) => m.take(1).toUpperCase
+      case SignUp(m)   => m.take(1).toUpperCase
+      case GetUsers(m) => m.take(1).toUpperCase
+    }
+  }
+
+  // GetUsers
+
+  case class GetUsers(shardId: String)
+
+  sealed trait GetUsersResponse
+
+  object GetUsersResponse {
+    case class Users(names: Set[String]) extends GetUsersResponse {
+      def ++(other: Users) = Users(names ++ other.names)
+    }
+
+    object Users extends DefaultJsonProtocol {
+      implicit val format = jsonFormat1(apply)
     }
   }
 
@@ -86,6 +105,10 @@ class UserService extends PersistentActor with ActorLogging {
     handleCommand orElse handleTimeout
 
   def handleCommand: Receive = {
+    case get: GetUsers =>
+      log.info("<< Users({})", names)
+      sender() ! Users(names)
+
     case SignUp(name) if names contains name =>
       log.info("<< NameTaken({})", name)
       sender() ! SignUpResponse.NameTaken(name)
