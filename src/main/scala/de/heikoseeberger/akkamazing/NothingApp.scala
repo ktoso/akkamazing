@@ -18,12 +18,11 @@ package de.heikoseeberger.akkamazing
 
 import akka.actor.ActorSystem
 
-object HttpServiceApp extends BaseApp {
+object NothingApp extends BaseApp {
 
   override protected def run(system: ActorSystem, opts: Map[String, String]): Unit = {
-    val settings = Settings(system)
-    import settings.httpService._
 
-    system.actorOf(HttpService.props(hostname, port), "http-service")
+    // ...
+
   }
 }

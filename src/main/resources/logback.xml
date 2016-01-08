@@ -5,7 +5,7 @@
         <!--<level>warn</level>-->
         <!--</filter>-->
         <encoder>
-            <pattern>%date{HH:mm:ss} %-5level %logger{0} [%X{akkaSource}] - %msg%n</pattern>
+            <pattern>%date{HH:mm:ss} %-5level %logger [%X{akkaSource}] - %msg%n</pattern>
         </encoder>
     </appender>
 
@@ -16,12 +16,12 @@
         </encoder>
     </appender>
 
-    <logger name="de.heikoseeberger.akkamazing" level="debug" additivity="false">
+    <logger name="de.heikoseeberger.akkamazing" level="DEBUG" additivity="false">
         <appender-ref ref="console"/>
         <appender-ref ref="file"/>
     </logger>
 
-    <logger name="akka.actor.RepointableActorRef" level="debug" additivity="false">
+    <logger name="akka.actor.RepointableActorRef" level="DEBUG" additivity="false">
         <appender-ref ref="console"/>
         <appender-ref ref="file"/>
     </logger>
@@ -29,12 +29,17 @@
     <logger name="Remoting" level="off" additivity="false">
     </logger>
 
+    <logger name="Remoting" level="off" additivity="false">
+    </logger>
+
+    <logger name="akka.cluster.ClusterHeartbeatSender" level="off"/>
+    <logger name="akka.cluster.client.ClusterReceptionist" level="INFO" additivity="false"/>
+
     <logger name="akka.remote.EndpointWriter" level="off" additivity="false">
     </logger>
 
-    <root level="warn">
+    <root level="DEBUG">
         <appender-ref ref="console"/>
-        <appender-ref ref="file"/>
     </root>
 
 </configuration>

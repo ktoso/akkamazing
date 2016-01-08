@@ -16,8 +16,8 @@
 
 package de.heikoseeberger.akkamazing
 
-import akka.actor.Props
-import akka.contrib.pattern.ClusterSharding
+import akka.actor.{ ActorPath, Props }
+import akka.cluster.client.{ ClusterClientSettings, ClusterClient }
 import akka.io.IO
 import akka.pattern.ask
 import spray.can.Http
@@ -34,37 +34,21 @@ object HttpService {
 class HttpService(hostname: String, port: Int) extends HttpServiceActor with SprayJsonSupport with SettingsActor {
 
   import context.dispatcher
-  import settings.httpService.askTimeout
 
-  private val userService =
-    ClusterSharding(context.system).shardRegion(UserService.Shard.name)
+  val initialContacts = Set(
+    ActorPath.fromString("akka.tcp://akkamazing-system@127.0.0.1:2551/system/receptionist"),
+    ActorPath.fromString("akka.tcp://akkamazing-system@127.0.0.1:2552/system/receptionist"))
+
+  val client =
+    context.actorOf(ClusterClient.props(ClusterClientSettings(context.system).withInitialContacts(initialContacts)))
+
+  client ! ClusterClient.Send("/user/example", "wat!!!", false)
+  client ! ClusterClient.Send("/user/example", "wat!!!", true)
 
   override def preStart(): Unit =
     IO(Http)(context.system) ! Http.Bind(self, hostname, port)
 
   override def receive: Receive =
-    runRoute(apiRoute)
+    { case _ => }
 
-  private def apiRoute: Route =
-    // format: OFF
-    pathPrefix("api") {
-      path("users") {
-        import de.heikoseeberger.akkamazing.UserService._
-        get {
-          complete {
-            (userService ? GetUsers).mapTo[GetUsersResponse.Users]
-          }
-        } ~
-        post {
-          entity(as[SignUp]) { signUp =>
-            complete {
-              (userService ? signUp).mapTo[SignUpResponse] map {
-                case SignUpResponse.NameTaken(name) => StatusCodes.Conflict
-                case SignUpResponse.SignedUp(name)  => StatusCodes.Created
-              }
-            }
-          }
-        }
-      }
-    } // format: ON
 }
